@@ -2,6 +2,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+import json
 
 spec = importlib.util.spec_from_file_location('partition', Path(__file__).resolve().parent.parent / 'scripts/partition.py')
 partition = importlib.util.module_from_spec(spec)
@@ -79,6 +82,21 @@ class PartitionTest(unittest.TestCase):
         self.assertIn({'ipBlock': {'cidr': '169.254.20.10/32'}}, dns['to'])
         self.assertEqual(dns['ports'], [{'protocol': 'UDP', 'port': 53}, {'protocol': 'TCP', 'port': 53}])
         self.assertFalse(allowed(policies, self.a, self.b))
+
+    def test_failed_reset_is_rejected_even_when_kubectl_attached_successfully(self):
+        response = {'status': {'ephemeralContainerStatuses': [
+            {'name': 'reset', 'state': {'terminated': {'exitCode': 1}}}
+        ]}}
+        with patch.object(partition, 'kubectl', return_value=SimpleNamespace(stdout=json.dumps(response))):
+            with self.assertRaises(RuntimeError):
+                partition.check_debug_exit('fe-0', 'reset')
+
+    def test_successful_reset_requires_a_confirmed_zero_exit_status(self):
+        response = {'status': {'ephemeralContainerStatuses': [
+            {'name': 'reset', 'state': {'terminated': {'exitCode': 0}}}
+        ]}}
+        with patch.object(partition, 'kubectl', return_value=SimpleNamespace(stdout=json.dumps(response))):
+            partition.check_debug_exit('fe-0', 'reset')
 
 
 if __name__ == '__main__':

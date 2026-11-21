@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import time
+import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
 NAMESPACE = "starrocks"
@@ -64,6 +66,20 @@ def stop():
     print("Partition policies and temporary labels removed. Check database membership and replica recovery.")
 
 
+def check_debug_exit(pod, container):
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        status = json.loads(kubectl('get', 'pod', pod, '-o', 'json').stdout)['status']
+        for item in status.get('ephemeralContainerStatuses', []):
+            if item['name'] == container and 'terminated' in item.get('state', {}):
+                code = item['state']['terminated']['exitCode']
+                if code != 0:
+                    raise RuntimeError(f'TCP reset container {container} in {pod} exited with {code}. Inspect its logs; policies remain applied.')
+                return
+        time.sleep(1)
+    raise RuntimeError(f'TCP reset completion could not be verified in {pod}. Policies remain applied.')
+
+
 def start(zone):
     existing = json.loads(kubectl("get", "networkpolicy", "-o", "json").stdout)["items"]
     if existing:
@@ -106,12 +122,15 @@ def start(zone):
         opposite = [str(ipaddress.ip_address(p["status"]["podIP"])) for p in members
                     if (p["lab_zone"] == zone) != (pod["lab_zone"] == zone)]
         command = "set -eu; " + "; ".join(f"ss --kill state established dst {ip}" for ip in opposite)
+        container = 'fmea-reset-' + uuid.uuid4().hex[:8]
         print(f"Resetting cross-zone connections in {pod['metadata']['name']}", flush=True)
         result = kubectl("debug", pod["metadata"]["name"], "--quiet", "--attach=true",
-                         "--image=nicolaka/netshoot:v0.14", "--profile=netadmin", "--", "sh", "-c", command,
+                         f'--container={container}', "--image=nicolaka/netshoot:v0.14", "--profile=netadmin", "--", "sh", "-c", command,
                          check=False)
         if result.returncode:
             raise RuntimeError(f"TCP reset failed: {result.stderr}\nPolicies remain applied. Run partition.py stop to recover.")
+        # kubectl attach/debug success alone does not establish the command's exit status.
+        check_debug_exit(pod['metadata']['name'], container)
     verify()
 
 
