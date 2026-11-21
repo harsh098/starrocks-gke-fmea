@@ -90,7 +90,7 @@ Select the populated zone containing the leader:
 ./scripts/partition.py verify
 ```
 
-Replace the example zone with the leader's actual zone. The script labels the six database pods, applies policies to both sides, allows DNS, resets existing cross-zone TCP sessions using a `netadmin` ephemeral container, and probes new FE connections. It fails if the reset or connectivity checks fail. It never treats policy creation alone as proof of a partition.
+Replace the example zone with the leader's actual zone. The script labels the six database pods, applies policies to both sides, allows kube-dns and NodeLocal DNS, and resets existing cross-zone TCP sessions using a `netadmin` ephemeral container. It checks DNS from each zone, probes BE heartbeat ports across both sides, and checks new connections between the majority FEs. Using BE probes keeps the network check independent of an isolated FE restarting. It fails if the reset, DNS, or connectivity checks fail. It never treats policy creation alone as proof of a partition.
 
 Existing allow policies can bypass a partition because NetworkPolicy permissions are additive. The script therefore refuses to start if the dedicated `starrocks` namespace already has policies. Recreated pods stay blocked by the default policy until the experiment is stopped; restart-induced membership changes require a new run. Node traffic, API-server exec access, and DNS are exceptions to the simulation, so this is not a complete physical zone outage. The script does not change GKE control-plane networking.
 

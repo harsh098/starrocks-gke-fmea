@@ -81,6 +81,8 @@ class PartitionTest(unittest.TestCase):
             self.assertTrue(matches(peer['namespaceSelector'], {'kubernetes.io/metadata.name': 'kube-system'}))
             self.assertFalse(matches(peer['namespaceSelector'], {'kubernetes.io/metadata.name': 'other'}))
             self.assertTrue(matches(peer['podSelector'], {'k8s-app': 'kube-dns'}))
+            self.assertTrue(matches(peer['podSelector'], {'k8s-app': 'node-local-dns'}))
+            self.assertFalse(matches(peer['podSelector'], {'k8s-app': 'other'}))
 
     def test_node_local_dns_is_scoped_to_the_resolver_and_dns_ports(self):
         policies = partition.policies('us-west4-a', '169.254.20.10')

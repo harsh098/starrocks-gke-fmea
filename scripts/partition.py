@@ -48,7 +48,8 @@ def policies(zone, dns_ip=None):
     # Select every lab pod, including newly recreated pods that lack a zone label.
     # Those replacements remain blocked until the experiment is stopped.
     dns = {"to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
-                   "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
+                   "podSelector": {"matchExpressions": [{"key": "k8s-app", "operator": "In",
+                                                            "values": ["kube-dns", "node-local-dns"]}]}}],
            "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]}
     if dns_ip is not None:
         resolver = ipaddress.ip_address(dns_ip)
@@ -114,7 +115,13 @@ def start(zone):
         raise RuntimeError('Could not determine the pod DNS resolver.')
     for pod in members:
         kubectl("label", "pod", pod["metadata"]["name"], f"{ZONE}={pod['lab_zone']}", "--overwrite")
-    kubectl("apply", "-f", "-", data={"apiVersion": "v1", "kind": "List", "items": policies(zone, resolvers[0])})
+    dns_service = kubectl('get', 'service', 'kube-dns', '-n', 'kube-system',
+                          '-o', 'jsonpath={.spec.clusterIP}', check=False)
+    # GKE Dataplane V2 does not support Service IPs in ipBlock rules. Select the
+    # DNS/cache pods by label after service translation; retain /32 exceptions
+    # only for resolvers such as the link-local address used with Cloud DNS.
+    resolver_ip = None if resolvers[0] == dns_service.stdout.strip() else resolvers[0]
+    kubectl("apply", "-f", "-", data={"apiVersion": "v1", "kind": "List", "items": policies(zone, resolver_ip)})
     (ROOT / ".local").mkdir(exist_ok=True)
     (ROOT / ".local/partition.json").write_text(json.dumps({"zone": zone}))
     # NetworkPolicy handling of existing connections varies. Reset them explicitly.
@@ -142,21 +149,41 @@ def verify():
     fes = [p for p in members if p["metadata"]["labels"].get("app.kubernetes.io/component") == "fe"]
     if len(fes) != 3 or any(ZONE not in p["metadata"]["labels"] for p in members):
         raise RuntimeError("Pod membership changed. Recreated pods are blocked by the default policy. Stop the partition, restore health, and start again.")
-    # Probe new TCP connections between every FE pair, in both directions.
-    for source in fes:
-        for target in fes:
+    bes = [p for p in members if p['metadata']['labels'].get('app.kubernetes.io/component') == 'be']
+    if len(bes) != 3:
+        raise RuntimeError('Expected three BE pods for independent network checks.')
+    majority_fes = [p for p in fes if p['metadata']['labels'][ZONE] != zone]
+    if len(majority_fes) != 2:
+        raise RuntimeError('Expected two majority-side FEs.')
+    dns_target = majority_fes[0]['metadata']['name'] + f'.{CLUSTER}-fe-search.{NAMESPACE}.svc.cluster.local'
+    for source in bes:
+        result = kubectl('exec', source['metadata']['name'], '-c', 'be', '--',
+                         'timeout', '5', 'getent', 'ahostsv4', dns_target, check=False)
+        if result.returncode != 0:
+            raise RuntimeError('DNS resolution could not be verified from every zone. Stop the partition and inspect the DNS exception before interpreting database behavior.')
+    print('PASS: DNS resolution works from all three zones.', flush=True)
+    # BEs keep serving during FE leadership changes. Use their heartbeat ports
+    # to check both partition directions independently of a restarting FE.
+    for source in bes:
+        for target in bes:
             if source is target:
                 continue
             same_side = ((source["metadata"]["labels"][ZONE] == zone) ==
                          (target["metadata"]["labels"][ZONE] == zone))
             ip = str(ipaddress.ip_address(target["status"]["podIP"]))
-            result = kubectl("exec", source["metadata"]["name"], "-c", "fe", "--",
-                             "timeout", "5", "bash", "-c", f"exec 3<>/dev/tcp/{ip}/9010", check=False)
+            result = kubectl("exec", source["metadata"]["name"], "-c", "be", "--",
+                             "timeout", "5", "bash", "-c", f"exec 3<>/dev/tcp/{ip}/9050", check=False)
             if same_side and result.returncode != 0:
-                raise RuntimeError("An expected same-side FE connection failed. Inspect pod health and policy enforcement.")
+                raise RuntimeError("An expected same-side BE connection failed. Inspect pod health and policy enforcement.")
             if not same_side and result.returncode != 124:
-                raise RuntimeError(f"Expected a blocked cross-zone FE connection to time out; got {result.returncode}. Inspect connectivity before interpreting database behavior.")
-    print("PASS: new FE TCP connections work within the majority and time out across the partition.")
+                raise RuntimeError(f"Expected a blocked cross-zone BE connection to time out; got {result.returncode}. Inspect connectivity before interpreting database behavior.")
+    for source, target in [majority_fes, majority_fes[::-1]]:
+        ip = str(ipaddress.ip_address(target['status']['podIP']))
+        result = kubectl('exec', source['metadata']['name'], '-c', 'fe', '--',
+                         'timeout', '5', 'bash', '-c', f'exec 3<>/dev/tcp/{ip}/9010', check=False)
+        if result.returncode != 0:
+            raise RuntimeError('A majority-side FE connection failed. Inspect pod health before interpreting database behavior.')
+    print("PASS: new BE connections work within the majority and time out across the partition; majority FEs can connect.", flush=True)
     print("Now check FE quorum, BE health, and writes from each side. Run partition.py stop to recover.")
 
 

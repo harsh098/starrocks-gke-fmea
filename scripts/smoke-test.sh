@@ -47,7 +47,21 @@ exists=$("$ROOT/scripts/sql.sh" --batch --skip-column-names -e \
 if [[ "$exists" == "0" ]]; then
   "$ROOT/scripts/sql.sh" < "$ROOT/experiments/seed.sql"
 fi
-"$ROOT/scripts/sql.sh" -e "SHOW CREATE TABLE fmea.events; ADMIN SHOW REPLICA STATUS FROM fmea.events;"
+"$ROOT/scripts/sql.sh" -e "SHOW CREATE TABLE fmea.events;"
+"$ROOT/scripts/sql.sh" --batch -e "ADMIN SHOW REPLICA STATUS FROM fmea.events;" > "$ROOT/.local/replicas.tsv"
+cat "$ROOT/.local/replicas.tsv"
+python3 - "$ROOT/.local/replicas.tsv" <<'PY'
+import csv, sys
+rows = list(csv.DictReader(open(sys.argv[1]), delimiter='\t'))
+tablets = {}
+for row in rows:
+    assert row['Status'] == 'OK' and row['State'] == 'NORMAL', 'A tablet replica is not healthy'
+    assert row['IsBad'].lower() == 'false', 'A tablet replica is marked bad'
+    tablets.setdefault(row['TabletId'], set()).add(row['BackendId'])
+assert len(rows) == 12 and len(tablets) == 4, 'Expected four tablets with twelve replicas'
+assert all(len(backends) == 3 for backends in tablets.values()), 'Each tablet needs replicas on three distinct BEs'
+print('PASS: all four tablets have three healthy replicas on distinct BEs')
+PY
 "$ROOT/scripts/sql.sh" --batch --skip-column-names -e \
   "SELECT COUNT(*) FROM fmea.events WHERE event_id IN (1,2,3);" | grep -qx 3
 echo "PASS: baseline rows can be read from the three-replica test table"
