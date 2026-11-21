@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture a manually triggered GKE surge run; never changes nodes or FE metadata.
+"""Capture client responses and database recovery during a manual GKE surge run.
 
 Writes only to a new, explicitly named SQL probe database and local evidence files.
 Stop with SIGINT or an output/STOP file. Evidence can contain infrastructure names;
@@ -22,7 +22,6 @@ ROOT = Path(__file__).resolve().parents[1]
 NS = "starrocks"
 CLUSTER = "starrocks-fmea"
 SELECTOR = f"app.starrocks.ownerreference/name in ({CLUSTER}-fe,{CLUSTER}-be)"
-FAILURE = re.compile(r"Ids: \d+ were equal|UNEXPECTED_STATE|LogIntegrityException|ChecksumException")
 
 
 def run(argv, timeout=25, input_text=None):
@@ -44,18 +43,6 @@ def sql(pod, statement):
     return kube("-n", NS, "exec", pod, "-c", "fe", "--", "mysql",
                 "--connect-timeout=5", "--batch", "--host=127.0.0.1", "--port=9030",
                 "--user=root", "-e", statement)
-
-
-def je_group(pod):
-    helpers = " ".join(f"{CLUSTER}-fe-{i}.{CLUSTER}-fe-search.{NS}.svc.cluster.local" for i in range(3))
-    command = ('d=$(mktemp -d /tmp/je-readonly.XXXXXX); '
-               'trap \'rm -rf "$d"\' EXIT; cat > "$d/ReadJeGroup.java"; '
-               'java -Xms16m -Xmx64m --class-path '
-               '/opt/starrocks/fe/lib/starrocks-bdb-je-18.3.20.jar '
-               '"$d/ReadJeGroup.java" ' + helpers)
-    return run(["kubectl", "--request-timeout=15s", "-n", NS, "exec", "-i", pod,
-                "-c", "fe", "--", "sh", "-c", command],
-               input_text=(ROOT / "experiments/ReadJeGroup.java").read_text())
 
 
 def save(path, value):
@@ -112,15 +99,11 @@ def main():
                 pod = f"{CLUSTER}-fe-{ordinal}"
                 tasks[f"fe-{ordinal}-logs"] = lambda p=pod: kube("-n", NS, "logs", p, "-c", "fe", "--timestamps", f"--since-time={start_utc}")
                 tasks[f"fe-{ordinal}-previous"] = lambda p=pod: kube("-n", NS, "logs", p, "-c", "fe", "--previous", "--timestamps", f"--since-time={start_utc}")
-                tasks[f"fe-{ordinal}-identity"] = lambda p=pod: kube("-n", NS, "exec", p, "-c", "fe", "--", "sh", "-c", "cat /opt/starrocks/fe/meta/image/ROLE; ls -l /opt/starrocks/fe/meta/bdb; tail -n 100 /opt/starrocks/fe/meta/bdb/je.info.0 2>/dev/null")
                 tasks[f"fe-{ordinal}-membership"] = lambda p=pod: sql(p, "SHOW FRONTENDS; SHOW BACKENDS;")
-                tasks[f"fe-{ordinal}-je-group"] = lambda p=pod: je_group(p)
             futures = {key: pool.submit(fn) for key, fn in tasks.items()}
             for key, future in futures.items():
                 result = future.result()
                 save(snapshot / f"{key}.json", result)
-                if key.endswith(("logs", "previous", "identity", "je-group")) and FAILURE.search(result["stdout"] + result["stderr"]):
-                    (args.output / "IDENTITY_OR_INTEGRITY_FAILURE").write_text(str(snapshot / f"{key}.json") + "\n")
             pods_result = futures["pods"].result()
             ready = []
             if pods_result["code"] == 0:
@@ -137,10 +120,7 @@ def main():
                 if iteration % 3 == 0:
                     save(snapshot / "ddl.json", sql(client, f"CREATE TABLE {db}.ddl_{iteration} (id BIGINT) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1 PROPERTIES ('replication_num'='3'); DROP TABLE {db}.ddl_{iteration};"))
             save(args.output / "acknowledged.json", acknowledged)
-            print(json.dumps({"iteration": iteration, "ready_clients": len(ready), "acknowledged": len(acknowledged), "identity_failure": (args.output / "IDENTITY_OR_INTEGRITY_FAILURE").exists()}), flush=True)
-            if (args.output / "IDENTITY_OR_INTEGRITY_FAILURE").exists():
-                print("Failure captured; stop cloud upgrade progression and preserve evidence before recovery.", flush=True)
-                break
+            print(json.dumps({"iteration": iteration, "ready_clients": len(ready), "acknowledged": len(acknowledged)}), flush=True)
             for _ in range(15):
                 if stop or (args.output / "STOP").exists():
                     break

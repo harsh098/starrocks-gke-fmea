@@ -21,7 +21,7 @@ This repository creates the environment for Part 2 and provides procedures to co
 
 FE metadata consensus counts voting FEs. BE write quorum counts acknowledgments from replicas of **each tablet**. Both thresholds are two of three here, but they serve different purposes.
 
-The deployment values adapt the sandbox reference. This standalone lab removes external secret controllers, workload-specific cloud permissions, TLS infrastructure, fixed service IPs, telemetry sidecars, backups, and unrelated environments. It uses a smaller FE heap that fits the container memory limit. The current reference uses chart `1.11.4` and a moving `3.5-latest` image; this lab pins explicit versions to make new runs easier to compare. The historical experiment's exact image digest was not recorded, so this is a reproducible baseline rather than an exact historical image reconstruction.
+The deployment values adapt the sandbox reference. This standalone lab removes external secret controllers, workload-specific cloud permissions, TLS infrastructure, fixed service IPs, telemetry sidecars, backups, and unrelated environments. It uses a smaller FE heap that fits the container memory limit and pins explicit chart and image versions so runs can be compared.
 
 The two upstream chart archives are included under `deploy/charts` with checksums and their license. Setup and validation use those archives so chart downloads cannot silently change between runs.
 

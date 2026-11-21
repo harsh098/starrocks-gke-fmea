@@ -75,9 +75,9 @@ kubectl get node "$NODE" -o jsonpath='{.spec.providerID}{"\n"}'
 gcloud compute instances reset INSTANCE --zone ZONE --project PROJECT
 ```
 
-If you need permanent worker replacement, use the node pool's managed instance group's `recreate-instances` operation for that one VM and record it as a separate experiment. Do not delete the Kubernetes Node object as a substitute for losing the VM. Check disk attachment, FE startup logs, member identity, and tablet recovery. Do not infer a metadata-corruption cause from a single failed restart, and do not delete metadata PVCs as routine recovery.
+If you need permanent worker replacement, use the node pool's managed instance group's `recreate-instances` operation for that one VM and record it as a separate experiment. Do not delete the Kubernetes Node object as a substitute for losing the VM. Check disk attachment, FE startup logs, database membership, and tablet recovery.
 
-For actual GKE maintenance, use the [surge upgrade procedure](surge-upgrade.md). It captures persisted FE names, JE numeric identities, storage bindings, image digests, and client acknowledgments across real worker replacement.
+For actual GKE maintenance, use the [surge upgrade procedure](surge-upgrade.md). It captures storage bindings, image digests, database membership, and client acknowledgments across real worker replacement.
 
 ## 4. Zone network partition
 

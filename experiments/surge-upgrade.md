@@ -1,6 +1,6 @@
-# GKE surge upgrade and FE identity recovery
+# GKE surge upgrade and recovery
 
-This experiment replaces actual GKE workers while recording FE identity, storage,
+This experiment replaces actual GKE workers while recording storage bindings,
 membership, and client results. A pod deletion does not exercise the same sequence.
 Use only the lab cluster. Keep the captured files private: they include infrastructure
 names, addresses, and logs.
@@ -21,16 +21,12 @@ python3 scripts/capture-surge.py \
 Leave this terminal running. Use a new output directory and database for each run.
 The collector creates a small three-replica probe table, attempts inserts and DDL,
 and records successful insert acknowledgments separately from failed or timed-out
-requests. It captures pod UIDs, image digests, node identity, PVC/PV bindings,
-volume attachments, persisted FE `ROLE` files, logs, and membership.
+requests. It captures pod UIDs, image digests, worker placement, PVC/PV bindings,
+volume attachments, logs, and membership.
 
 The table-creation probes request three replicas. They can be rejected while only
 two BEs are alive, even when existing tables can still accept majority writes.
 Record that as a placement/capacity requirement, not as loss of the FE quorum.
-
-`ReadJeGroup.java` queries the live replication group over JE's admin protocol. It
-prints the group UUID, ID sequence, and numeric ID-to-name mapping. It does not open
-the metadata directory. The helper uses the JE 18.3.20 jar in the pinned lab image.
 
 In a second terminal, after the probe setup succeeds:
 
@@ -81,27 +77,17 @@ time. The replacement must be in the original volume's zone. Record actual worke
 UID/provider-ID changes: a completed upgrade operation alone does not prove that
 workers were replaced. Our same-version request completed without replacing them.
 
-Keep the StarRocks image fixed for the first run. The old reference used a mutable
-`3.5-latest` tag; a replacement worker could have pulled a different binary. Test
-any image change separately with both digests recorded.
+Keep the StarRocks image fixed during the worker upgrade. Test any image change
+separately with both digests recorded.
 
 ## Observe and preserve
 
 Check these conditions throughout the run:
 
-- Does each FE retain its original persisted name and original PVC/PV binding?
-- Does the JE group retain a consistent numeric ID-to-name mapping?
+- Do replacement database pods mount their original PVCs and PVs?
 - Can the surviving voting majority elect or retain a leader?
 - Which client operations succeed, fail explicitly, or have an unknown outcome?
 - Do returning FEs rejoin, and do all tablet replicas recover?
-
-If the identity exception appears, preserve its complete stack trace and all
-metadata evidence before any repair. Cancel further upgrade progression using the
-active operation ID; cancellation allows already-started replacements to finish.
-Do not delete PVCs, reset the replication group, or remove followers before saving
-the failed state. The collector marks an observed identity/integrity error with
-`IDENTITY_OR_INTEGRITY_FAILURE` and stops its own probes. It does not cancel GKE
-operations itself.
 
 After the upgrade and recovery, stop the direct writer and collector:
 
@@ -117,11 +103,8 @@ Check replica health for the probe table as well as the baseline table. A timeou
 can occur after commit; verify its ID before retrying. Preserve evidence before
 removing the probe database and client Deployment.
 
-Successful recovery validates this run's conditions. It does not establish why an
-earlier upgrade failed. The historical error has a known related bootstrap path in
-[StarRocks issue 7498](https://github.com/StarRocks/starrocks/issues/7498), with a
-guard added by [PR 8039](https://github.com/StarRocks/starrocks/pull/8039). That path
-is a hypothesis to investigate, not an established cause of the GKE incident.
+Successful recovery validates this run's conditions. Record the versions, workload,
+and disruption settings alongside the result.
 
 References: [GKE surge behavior](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies),
 [manual upgrades](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/upgrading-a-cluster).

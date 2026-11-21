@@ -54,14 +54,12 @@ Container image digests were compared before and after and were unchanged.
 | Check | Observed outcome |
 | --- | --- |
 | Actual replacement | All three original workers and all six original database pods replaced; final workers run the target version |
-| Storage identity | All six PVC UIDs, PV UIDs, volume bindings, and disk handles unchanged |
-| FE identity | All three persisted names unchanged; JE group UUID, numeric ID-to-name mappings, and ID sequence unchanged |
+| Storage bindings | All six PVC UIDs, PV UIDs, volume bindings, and disk handles unchanged |
 | Leadership | FE-2 was leader before its drain; FE-1 became leader; FE-2 rejoined as follower |
 | Acknowledged inserts | All 279 unique acknowledged IDs remained readable: 192 direct-client inserts and 87 exec probes |
 | Direct SQL errors | Two during leader handoff: socket closed by peer and connection timeout; both IDs were absent after recovery |
 | Table DDL | 26 create/drop pairs succeeded; two were rejected with only two BEs alive and three replicas requested; one failed with a closed connection |
 | Recovery | Three alive FEs, three alive BEs, twelve healthy baseline replicas, and three healthy probe replicas |
-| Original JE identity exception | Not reproduced; no matching identity/integrity exceptions in captured FE streams or the run's Cloud Logging query |
 | Infrastructure after upgrade | OpenTofu plan reported no changes |
 
 The direct SQL client used the FE Service. Its logs were streamed locally and
@@ -75,13 +73,12 @@ during the control-plane upgrade. It is not counted as a database error. The
 three-replica table-creation rejections are distinct from majority writes to an
 existing table and do not establish loss of FE quorum.
 
-This run reproduced the surge maintenance sequence and a brief client-visible
-interruption, not the historical identity mismatch. The original reference used
-`3.5-latest`; its exact image digest and full incident stack trace are unavailable.
-The current pinned-version result cannot rule out an issue in that earlier code,
-state, or timing. Follow the [surge procedure](../experiments/surge-upgrade.md) for
-another run, preserving failed state before repair if the mismatch appears.
+This run exercised worker replacement, leader handoff, acknowledged-write
+retention, and full replica recovery. Follow the
+[surge procedure](../experiments/surge-upgrade.md) for another run.
 
 ## Limits
+
+The reported FE metadata bug has not been reproduced. Its root cause is unconfirmed, and it is excluded from the supported experiments.
 
 This lab provides bounded operational tests. It does not prove complete ACID behavior, linearizability, disaster recovery, or production readiness. The partition policy model tests reachability rules; live checks are needed to verify enforcement and database responses in a real cluster. Preserve client responses, image digests, membership, replica state, and timestamps for each run.
