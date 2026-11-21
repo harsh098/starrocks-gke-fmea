@@ -40,9 +40,9 @@ def allowed(policies, source, target):
 class PartitionTest(unittest.TestCase):
     def setUp(self):
         self.policies = partition.policies('us-west4-a')
-        self.a = {partition.OWNER: partition.CLUSTER, partition.ZONE: 'us-west4-a'}
-        self.b = {partition.OWNER: partition.CLUSTER, partition.ZONE: 'us-west4-b'}
-        self.c = {partition.OWNER: partition.CLUSTER, partition.ZONE: 'us-west4-c'}
+        self.a = {partition.OWNER: partition.CLUSTER + '-fe', partition.ZONE: 'us-west4-a'}
+        self.b = {partition.OWNER: partition.CLUSTER + '-fe', partition.ZONE: 'us-west4-b'}
+        self.c = {partition.OWNER: partition.CLUSTER + '-fe', partition.ZONE: 'us-west4-c'}
 
     def test_minority_cannot_reach_majority_in_either_direction(self):
         for healthy in [self.b, self.c]:
@@ -55,7 +55,7 @@ class PartitionTest(unittest.TestCase):
         self.assertTrue(allowed(self.policies, self.a, self.a))
 
     def test_replacement_without_zone_label_cannot_escape(self):
-        replacement = {partition.OWNER: partition.CLUSTER}
+        replacement = {partition.OWNER: partition.CLUSTER + '-be'}
         for side in [self.a, self.b, self.c]:
             self.assertFalse(allowed(self.policies, replacement, side))
             self.assertFalse(allowed(self.policies, side, replacement))
@@ -64,6 +64,12 @@ class PartitionTest(unittest.TestCase):
         unrelated = {partition.ZONE: 'us-west4-a'}
         self.assertFalse(allowed(self.policies, self.a, unrelated))
         self.assertFalse(allowed(self.policies, unrelated, self.a))
+
+    def test_backend_owners_are_selected_with_the_frontends(self):
+        backend = {partition.OWNER: partition.CLUSTER + '-be', partition.ZONE: 'us-west4-b'}
+        self.assertTrue(allowed(self.policies, self.c, backend))
+        self.assertFalse(allowed(self.policies, self.a, backend))
+        self.assertFalse(allowed(self.policies, backend, self.a))
 
     def test_dns_exception_is_limited_to_cluster_dns(self):
         for labels in [self.a, self.b, self.c]:

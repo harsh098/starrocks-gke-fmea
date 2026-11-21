@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export KUBECONFIG="${KUBECONFIG:-$ROOT/.local/kubeconfig}"
 NAMESPACE=starrocks
 CLUSTER=starrocks-fmea
-SELECTOR="app.starrocks.ownerreference/name=$CLUSTER"
+SELECTOR="app.starrocks.ownerreference/name in ($CLUSTER-fe,$CLUSTER-be)"
 CHART_VERSION=1.11.4
 
 if [[ -n "${TF_BIN:-}" ]]; then

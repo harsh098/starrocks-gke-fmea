@@ -11,7 +11,7 @@ Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google
 | Both Helm charts lint and render with the lab values | Passed |
 | Rendered StarRocksCluster against the v1.11.4 CRD schema | Passed |
 | Images, replicas, Secret references, storage, and internal services | Passed |
-| Partition tests for reachability rules, replacements, DNS, and debug-container exit status | Eight tests passed |
+| Partition tests for FE/BE labels, reachability rules, replacements, DNS, and debug-container exit status | Nine tests passed |
 | Shell syntax | Passed |
 
 `./scripts/validate.sh` runs the OpenTofu checks, chart checksum checks, rendering, schema checks, shell syntax checks, and policy tests. These checks do not require GCP credentials. Terraform was also checked in an independent local directory to keep it separate from the live OpenTofu state.

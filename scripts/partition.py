@@ -15,7 +15,7 @@ OWNER = "app.starrocks.ownerreference/name"
 CLUSTER = "starrocks-fmea"
 ZONE = "fmea.starrocks.io/zone"
 TAG = {"fmea.starrocks.io/experiment": "partition"}
-SELECTOR = f"{OWNER}={CLUSTER}"
+SELECTOR = f"{OWNER} in ({CLUSTER}-fe,{CLUSTER}-be)"
 
 
 def kubectl(*args, data=None, check=True):
@@ -31,10 +31,11 @@ def pods():
 
 
 def policies(zone, dns_ip=None):
+    owners = {"key": OWNER, "operator": "In", "values": [f"{CLUSTER}-fe", f"{CLUSTER}-be"]}
     def group(isolated):
-        expressions = [{"key": ZONE, "operator": "Exists"}]
+        expressions = [owners, {"key": ZONE, "operator": "Exists"}]
         expressions.append({"key": ZONE, "operator": "In" if isolated else "NotIn", "values": [zone]})
-        return {"matchLabels": {OWNER: CLUSTER}, "matchExpressions": expressions}
+        return {"matchExpressions": expressions}
 
     def policy(name, selector, ingress, egress):
         return {
@@ -52,7 +53,7 @@ def policies(zone, dns_ip=None):
     if dns_ip is not None:
         resolver = ipaddress.ip_address(dns_ip)
         dns['to'].append({'ipBlock': {'cidr': f'{resolver}/{resolver.max_prefixlen}'}})
-    result = [policy("fmea-partition-default", {"matchLabels": {OWNER: CLUSTER}}, [], [dns])]
+    result = [policy("fmea-partition-default", {"matchExpressions": [owners]}, [], [dns])]
     for isolated, name in [(True, "isolated"), (False, "majority")]:
         peer = {"podSelector": group(isolated)}
         result.append(policy(f"fmea-partition-{name}", group(isolated), [{"from": [peer]}], [{"to": [peer]}]))
