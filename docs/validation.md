@@ -2,7 +2,7 @@
 
 ## Static checks
 
-Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google provider `8.12.0`, and Helm `3.19.0`.
+Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google provider `8.12.0`, and Helm `3.19.0`. The revised OpenTofu configuration, including the blue-green default, was checked again on 22 November 2026 (IST).
 
 | Check | Result |
 | --- | --- |
@@ -33,6 +33,7 @@ Validated on GKE `1.36.4-gke.2377000` in `us-west4`, with three `n2-standard-8` 
 | Majority metadata and tablet writes during that partition | Both succeeded |
 | Metadata write attempted on the isolated FE | Local SQL connection refused; no successful write acknowledgment observed |
 | Recovery | All six members and all twelve test-table replicas healthy; the acknowledged write remained readable |
+| Forced FE follower deletion | Partial success: replacement pod rejoined with the same volume; membership, all twelve replicas, and baseline reads recovered |
 
 The partition helper explicitly allows both `kube-dns` and `node-local-dns` pods. An earlier probe omitted the NodeLocal DNS label and timed out; that run was discarded as a confounded experiment. The helper now checks DNS before reporting a valid partition. It also checks the debug container's exit status after each TCP reset.
 
@@ -79,6 +80,19 @@ retention, and full replica recovery. Follow the
 
 ## Limits
 
-The reported FE metadata bug has not been reproduced. Its root cause is unconfirmed, and it is excluded from the supported experiments.
+The forced-deletion result covers one FE follower. Abrupt VM loss and simultaneous
+loss of multiple voting FEs were not validated in that run. The one-hour stale
+credential window is planned for a later password-rotation test.
+
+Blue-green upgrades are configured for the next deployment and have passed static
+validation; they have not yet been exercised in this lab.
 
 This lab provides bounded operational tests. It does not prove complete ACID behavior, linearizability, disaster recovery, or production readiness. The partition policy model tests reachability rules; live checks are needed to verify enforcement and database responses in a real cluster. Preserve client responses, image digests, membership, replica state, and timestamps for each run.
+
+## Lab lifecycle
+
+The environment was decommissioned on 22 November 2026 (IST). OpenTofu destroyed
+all eleven managed resources and the state is empty. The lab's worker VMs, boot
+disks, and six database disks were verified deleted. A new apply and deployment
+are required before another experiment. Project APIs remain enabled as configured
+by `disable_on_destroy = false`.

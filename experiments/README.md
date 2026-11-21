@@ -4,9 +4,9 @@ These procedures adapt the reference sandbox's FMEA scenarios. They describe wha
 
 Before each experiment, run `./scripts/smoke-test.sh` and record [the baseline](../docs/run-record.md). Export `KUBECONFIG="$PWD/.local/kubeconfig"` for the direct kubectl commands below. Capture timestamps, client responses, database membership, replica status, pod events, and relevant FE/BE logs. Run only one disruption at a time.
 
-## 1. FE follower or leader restart
+## 1. FE pod loss and rejoin
 
-**Model:** Node crash-recovery. Pod deletion requests graceful termination, so it is not an abrupt process-kill test.
+**Model:** Node crash-recovery. A normal pod deletion requests graceful termination. Force deletion requests replacement with zero grace, but the API response alone does not confirm that the old process has stopped.
 
 Find the leader (`Role = LEADER`) and voting followers:
 
@@ -27,6 +27,28 @@ kubectl -n starrocks rollout status statefulset/starrocks-fmea-fe --timeout=10m
 Repeat with the leader after full recovery. If FE-0 is the target, set `SR_FE_POD=starrocks-fmea-fe-1` (or another live FE) for the SQL calls.
 
 Check that the two surviving voters can commit metadata, that a leader is elected when needed, and that the restarted member rejoins. Measure interruption and recovery times. A client timeout alone does not prove that an operation was not committed; query the database afterward.
+
+For the forced-deletion variant, record the selected pod's UID, then run:
+
+```bash
+kubectl -n starrocks get pod starrocks-fmea-fe-1 -o jsonpath='{.metadata.uid}{"\n"}'
+kubectl -n starrocks delete pod starrocks-fmea-fe-1 --grace-period=0 --force --wait=false
+kubectl -n starrocks rollout status statefulset/starrocks-fmea-fe --timeout=10m
+kubectl -n starrocks get pod starrocks-fmea-fe-1 -o jsonpath='{.metadata.uid}{"\n"}'
+./scripts/sql.sh -e 'SHOW FRONTENDS;'
+./scripts/smoke-test.sh
+```
+
+Confirm that the replacement has a new UID and is alive in database membership.
+For multiple replacements, recover fully after each pod. Deleting two of three
+voting FEs together removes the majority and is a separate quorum-loss scenario.
+
+**Recorded result: partial success.** One FE follower was force-deleted and its
+replacement rejoined successfully using the same volume. All three FEs and BEs
+were alive afterward, all twelve baseline tablet replicas were healthy, and the
+baseline rows remained readable. This validates that bounded replacement and
+rejoin case. It does not establish recovery from abrupt VM loss or simultaneous
+loss of multiple voters.
 
 ## 2. BE restart
 
@@ -123,6 +145,28 @@ Repeat by isolating a follower's zone only after full recovery. Ephemeral debug 
 
 Record the existing `starrocks-admin-password` Secret in a protected local file before changing anything. Do not commit it or include the password in logs. The initial generated password is also in `.local/root-password` if you created the cluster with this repo.
 
+For the next run, keep the Kubernetes Secret stale for a one-hour test window
+after rotating the database password, and restart one BE during that window. This
+lab uses a manually managed Secret; no controller refreshes it automatically.
+`MYSQL_PWD` is read from the Secret when a container starts and has no refresh
+interval inside an existing container.
+
+If your deployment uses External Secrets Operator, set its polling interval to
+one hour with the optional patch below. This applies to an existing
+`ExternalSecret`; the baseline lab does not install that controller:
+
+```bash
+kubectl -n starrocks patch externalsecret starrocks-admin-password \
+  --type=merge --patch-file=experiments/password-sync-delay.patch.yaml
+```
+
+The interval delays Secret synchronization, not the database password change or
+an existing process's environment. Rotate soon after a completed sync and confirm
+that the Kubernetes Secret still holds the old value before restarting the BE.
+A one-hour polling interval does not guarantee a full hour from an arbitrary
+rotation time. Updating the Secret afterward still requires a replacement
+container to pick up the new environment value.
+
 1. Change the database root password through an interactive MySQL session, using `SET PASSWORD FOR 'root'@'%' = PASSWORD('<new-lab-password>');` with your own lab-only value. Keep the Kubernetes Secret unchanged for this first phase.
 2. Restart **one** BE. Inspect its startup logs and registration. Check write availability while two healthy BE replicas remain. Do not restart another BE while the first is unhealthy.
 3. Update the existing Kubernetes Secret's `password` key to the current database password. Supply it through a protected file, rather than a command-line literal:
@@ -144,3 +188,6 @@ Record the existing `starrocks-admin-password` Secret in a protected local file 
 6. Recover the lab by returning the database password and Secret to the original value, or by completing a controlled one-at-a-time FE/BE restart with the new value. Check both groups and all tablet replicas after each member. Updating the Secret alone does not update running containers or rotate the database password.
 
 For this pinned chart, the FE initialization job runs on the initial Helm install. Do not assume rerunning `deploy.sh` rotates credentials or fixes a drifted password. See the [versioned operator guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.4/doc/change_root_password_howto.md).
+
+The one-hour delay variant is planned for the next run; it has not yet been
+validated. See [ExternalSecret refresh policies](https://external-secrets.io/latest/api/externalsecret/).

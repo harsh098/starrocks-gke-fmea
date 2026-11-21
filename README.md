@@ -16,6 +16,7 @@ This repository creates the environment for Part 2 and provides procedures to co
 | BEs | Three members, each with 4 CPU and 16 GiB RAM |
 | Persistent storage | One 100 GiB `premium-rwo` zonal SSD per FE and BE, 600 GiB total |
 | Placement | Per-component hostname spread; the three-worker layout places one FE and one BE in each zone |
+| Planned node upgrades | Blue-green, one node per drain batch, 5-minute batch soak, 10-minute pool soak |
 | Test table | Three replicas per tablet, `MAJORITY` write quorum |
 | Access | ClusterIP services; SQL runs through `kubectl exec` |
 
@@ -34,7 +35,7 @@ The two upstream chart archives are included under `deploy/charts` with checksum
 
 The lab incurs charges for GKE, workers, disks, public worker IPs, logging, and network traffic. Worker IPs provide outbound image access. The Kubernetes API is restricted to your configured IPv4 CIDR. No database LoadBalancer is created. Use a separate project and run teardown after the experiments.
 
-Allow at least 750 GiB of SSD quota for the default setup: 600 GiB of database disks plus three 50 GiB `pd-balanced` boot disks. Existing disks and upgrade surge workers need additional quota.
+Allow at least 750 GiB of SSD quota for the default setup: 600 GiB of database disks plus three 50 GiB `pd-balanced` boot disks. Blue-green upgrades temporarily add three workers and their boot disks, bringing this lab's total to 900 GiB. Existing resources need separate headroom.
 
 ## 1. Create GKE
 
@@ -76,7 +77,7 @@ The first deployment generates a random root password in `.local/root-password` 
 
 The smoke check verifies worker placement, ready pods, database membership, and reads from a table with three replicas. It creates `fmea.events` only if the table is absent. If a step fails, inspect the pod events, init-password job, and FE/BE logs before running a disruption.
 
-If you have less than 600 GiB of free SSD quota **after creating the workers**, use the optional profile below **on the first deployment**. It creates six 25 GiB volumes, totaling 150 GiB of database storage, and differs from the article's storage capacity. Including worker boot disks, this profile uses 300 GiB of SSD quota before any existing disks or upgrade surge workers. Use the same override on subsequent deploys. Do not switch an existing cluster to smaller volumes; PVCs cannot be shrunk.
+If you have less than 600 GiB of free SSD quota **after creating the workers**, use the optional profile below **on the first deployment**. It creates six 25 GiB volumes, totaling 150 GiB of database storage, and differs from the article's storage capacity. Including worker boot disks, this profile uses 300 GiB of SSD quota and temporarily needs 450 GiB during blue-green upgrades, before any existing resources. Use the same override on subsequent deploys. Do not switch an existing cluster to smaller volumes; PVCs cannot be shrunk.
 
 ```bash
 SR_VALUES_FILE=deploy/small-storage-values.yaml ./scripts/deploy.sh
@@ -92,6 +93,16 @@ SR_VALUES_FILE=deploy/small-storage-values.yaml ./scripts/deploy.sh
 Follow [the experiment guide](experiments/README.md). It covers FE/BE restarts, planned worker drain, worker replacement, a zone network partition, and stale credentials after a password change. Each procedure states the fault, observations, and recovery steps. Record results using [the run template](docs/run-record.md).
 
 Run one disruption at a time. Wait for all voting FEs, BEs, and tablet replicas to recover before moving to the next experiment. A Ready pod alone does not prove database membership or data recovery. These checks do not establish full ACID compliance or linearizability.
+
+For planned GKE maintenance, we prefer blue-green upgrades so replacement capacity
+is ready before draining and there is a soak period to check database membership,
+client writes, and replica recovery before the old pool is removed. The next
+deployment defaults to `node_upgrade_strategy = "BLUE_GREEN"`; the batch and pool
+soak times above are lab settings. Validate the workload during the soak and pause
+the upgrade if recovery is incomplete. This is a maintenance preference, not a
+guarantee of recovery from every abrupt interruption. The blue-green path is
+prepared for the next deployment and has not yet been exercised in this lab.
+[GKE blue-green upgrades](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies#blue-green-upgrades)
 
 ## 4. Remove the lab
 

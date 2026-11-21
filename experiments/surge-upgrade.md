@@ -5,6 +5,11 @@ membership, and client results. A pod deletion does not exercise the same sequen
 Use only the lab cluster. Keep the captured files private: they include infrastructure
 names, addresses, and logs.
 
+The lab now defaults to blue-green node upgrades. To run this separate surge
+experiment, set `node_upgrade_strategy = "SURGE"` in your Terraform values before
+creating the lab. The recorded result below used surge settings; the new default
+does not change that historical result.
+
 ## Capture before changing workers
 
 Use the tools and credentials from the main README. From the repository root:
@@ -71,7 +76,7 @@ gcloud container clusters upgrade "$GKE_CLUSTER" \
   --region "$GKE_REGION" --project "$GKE_PROJECT"
 ```
 
-The baseline pool has `maxSurge=1` and `maxUnavailable=0`. Allow quota for an extra
+For this experiment, the pool must have `maxSurge=1` and `maxUnavailable=0`. Allow quota for an extra
 worker, including its boot disk. GKE processes this regional pool one zone at a
 time. The replacement must be in the original volume's zone. Record actual worker
 UID/provider-ID changes: a completed upgrade operation alone does not prove that

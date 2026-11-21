@@ -46,3 +46,14 @@ variable "machine_type" {
   type        = string
   default     = "n2-standard-8"
 }
+
+variable "node_upgrade_strategy" {
+  description = "Use blue-green for planned maintenance; SURGE is available for the separate surge experiment."
+  type        = string
+  default     = "BLUE_GREEN"
+
+  validation {
+    condition     = contains(["BLUE_GREEN", "SURGE"], var.node_upgrade_strategy)
+    error_message = "Use BLUE_GREEN or SURGE."
+  }
+}

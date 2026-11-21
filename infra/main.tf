@@ -110,8 +110,20 @@ resource "google_container_node_pool" "experiment" {
     auto_upgrade = true
   }
   upgrade_settings {
-    max_surge       = 1
-    max_unavailable = 0
+    strategy        = var.node_upgrade_strategy
+    max_surge       = var.node_upgrade_strategy == "SURGE" ? 1 : null
+    max_unavailable = var.node_upgrade_strategy == "SURGE" ? 0 : null
+
+    dynamic "blue_green_settings" {
+      for_each = var.node_upgrade_strategy == "BLUE_GREEN" ? [1] : []
+      content {
+        node_pool_soak_duration = "600s"
+        standard_rollout_policy {
+          batch_node_count    = 1
+          batch_soak_duration = "300s"
+        }
+      }
+    }
   }
   node_config {
     machine_type    = var.machine_type
