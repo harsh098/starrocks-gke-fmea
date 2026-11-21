@@ -23,8 +23,8 @@ def prune_nulls(value):
 jsonschema.validate(prune_nulls(cr), schema)
 assert cr['metadata']['name'] == 'starrocks-fmea'
 assert 'starRocksCnSpec' not in cr['spec'], 'The lab must be shared-nothing'
-for key, image in [('starRocksFeSpec', 'starrocks/fe-ubuntu:3.5.0'),
-                   ('starRocksBeSpec', 'starrocks/be-ubuntu:3.5.0')]:
+for key, image in [('starRocksFeSpec', 'starrocks/fe-ubuntu:3.5.21'),
+                   ('starRocksBeSpec', 'starrocks/be-ubuntu:3.5.21')]:
     spec = cr['spec'][key]
     assert spec['replicas'] == 3 and spec['image'] == image
     assert spec['service']['type'] == 'ClusterIP', 'Do not expose the database'
@@ -37,5 +37,11 @@ for key, image in [('starRocksFeSpec', 'starrocks/fe-ubuntu:3.5.0'),
     assert volumes[0]['storageClassName'] == 'premium-rwo'
 assert all(d.get('kind') != 'Secret' for d in cluster if d), 'No generated credential may enter Helm values'
 deployment = next(d for d in operator if d and d.get('kind') == 'Deployment')
-assert deployment['spec']['template']['spec']['containers'][0]['image'] == 'starrocks/operator:v1.11.1'
-print('PASS: CRD schema, pinned images, replicas, zonal storage, internal access, and Secret references')
+assert deployment['spec']['template']['spec']['containers'][0]['image'] == 'starrocks/operator:v1.11.4'
+small_docs = list(yaml.safe_load_all((root / '.local/validation/cluster-small.yaml').read_text()))
+small = next(d for d in small_docs if d and d.get('kind') == 'StarRocksCluster')
+jsonschema.validate(prune_nulls(small), schema)
+for key in ['starRocksFeSpec', 'starRocksBeSpec']:
+    volumes = [v for v in small['spec'][key]['storageVolumes'] if v.get('storageSize') != '0Gi']
+    assert len(volumes) == 1 and volumes[0]['storageSize'] == '25Gi'
+print('PASS: CRD schema, pinned images, replicas, both storage profiles, internal access, and Secret references')

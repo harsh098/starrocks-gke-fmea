@@ -27,7 +27,7 @@ import csv, sys
 rows = list(csv.reader(open(sys.argv[1]), delimiter='\t'))
 groups = []
 for row in rows:
-    if 'Alive' in row and ('IsMaster' in row or 'HeartbeatPort' in row):
+    if 'Alive' in row and ('EditLogPort' in row or 'HeartbeatPort' in row):
         groups.append((row, []))
     elif groups:
         groups[-1][1].append(row)
@@ -36,6 +36,9 @@ for header, members in groups:
     assert len(members) == 3, 'Expected three registered members'
     alive = header.index('Alive')
     assert all(r[alive].lower() == 'true' for r in members), 'A registered member is not alive'
+    if 'Role' in header:
+        roles = [r[header.index('Role')] for r in members]
+        assert roles.count('LEADER') == 1 and roles.count('FOLLOWER') == 2, 'Expected one leader and two voting followers'
 print('PASS: three alive FE members and three alive BE members')
 PY
 # Safe to rerun. Do not reseed an existing table.

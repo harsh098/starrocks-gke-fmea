@@ -8,7 +8,7 @@ Before each experiment, run `./scripts/smoke-test.sh` and record [the baseline](
 
 **Model:** Node crash-recovery. Pod deletion requests graceful termination, so it is not an abrupt process-kill test.
 
-Find the leader (`IsMaster`) and voting roles:
+Find the leader (`Role = LEADER`) and voting followers:
 
 ```bash
 ./scripts/sql.sh -e 'SHOW FRONTENDS;'
@@ -57,7 +57,7 @@ kubectl cordon "$NODE"
 kubectl drain "$NODE" --ignore-daemonsets --delete-emptydir-data --timeout=10m
 ```
 
-One worker hosts one FE and one BE. Operator `1.11.1` exposes no PDB field in `StarRocksCluster`; this baseline does not create a standalone PDB either. Draining another worker before recovery can remove both majorities.
+One worker hosts one FE and one BE. Operator `1.11.4` exposes no PDB field in `StarRocksCluster`; this baseline does not create a standalone PDB either. Draining another worker before recovery can remove both majorities.
 
 There is only one worker in each zone. Its zonal volumes cannot attach to a worker in another zone, so replacement pods may remain Pending while the selected worker is cordoned. This is an expected placement limit, separate from a failed database restart.
 
@@ -141,4 +141,4 @@ Record the existing `starrocks-admin-password` Secret in a protected local file 
 
 6. Recover the lab by returning the database password and Secret to the original value, or by completing a controlled one-at-a-time FE/BE restart with the new value. Check both groups and all tablet replicas after each member. Updating the Secret alone does not update running containers or rotate the database password.
 
-For this pinned chart, the FE initialization job runs on the initial Helm install. Do not assume rerunning `deploy.sh` rotates credentials or fixes a drifted password. See the [versioned operator guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.1/doc/change_root_password_howto.md).
+For this pinned chart, the FE initialization job runs on the initial Helm install. Do not assume rerunning `deploy.sh` rotates credentials or fixes a drifted password. See the [versioned operator guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.4/doc/change_root_password_howto.md).

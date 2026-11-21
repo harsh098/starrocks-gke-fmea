@@ -9,7 +9,7 @@ Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google
 | OpenTofu formatting, initialization, and validation | Passed |
 | Independent Terraform initialization and validation | Passed |
 | Both Helm charts lint and render with the lab values | Passed |
-| Rendered StarRocksCluster against the v1.11.1 CRD schema | Passed |
+| Rendered StarRocksCluster against the v1.11.4 CRD schema | Passed |
 | Images, replicas, Secret references, storage, and internal services | Passed |
 | Partition tests for reachability rules, replacements, DNS, and debug-container exit status | Eight tests passed |
 | Shell syntax | Passed |
@@ -18,7 +18,7 @@ Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google
 
 ## Cloud checks
 
-A GKE validation run is in progress. The run uses the optional 50 GiB storage profile because the available SSD quota is below the 600 GiB required by the default profile. No live experiment outcome is established by the static checks above.
+A GKE validation run is in progress. The run uses the optional 25 GiB storage profile because the available SSD quota is below the 750 GiB required by the default profile including worker boot disks. No live experiment outcome is established by the static checks above.
 
 The initial attempt hit `ZONE_RESOURCE_POOL_EXHAUSTED` for temporary `e2-medium` default workers in two zones. The lab now uses the current provider's support for creating GKE without a default pool. This requires GKE `1.36.4-gke.1469000` or later and allocates only the intended N2 experiment workers. If those workers also encounter a capacity error, inspect the managed instance group's errors and select an available machine type or region for a new run.
 

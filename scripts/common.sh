@@ -5,7 +5,7 @@ export KUBECONFIG="${KUBECONFIG:-$ROOT/.local/kubeconfig}"
 NAMESPACE=starrocks
 CLUSTER=starrocks-fmea
 SELECTOR="app.starrocks.ownerreference/name=$CLUSTER"
-CHART_VERSION=1.11.1
+CHART_VERSION=1.11.4
 
 if [[ -n "${TF_BIN:-}" ]]; then
   TF="$TF_BIN"

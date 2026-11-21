@@ -12,6 +12,9 @@ python3 "$ROOT/scripts/check-charts.py"
 helm template starrocks-fmea "$ROOT/deploy/charts/starrocks-$CHART_VERSION.tgz" --version "$CHART_VERSION" \
   --namespace starrocks --values "$ROOT/deploy/cluster-values.yaml" \
   > "$ROOT/.local/validation/cluster.yaml"
+helm template starrocks-fmea "$ROOT/deploy/charts/starrocks-$CHART_VERSION.tgz" --version "$CHART_VERSION" \
+  --namespace starrocks --values "$ROOT/deploy/cluster-values.yaml" --values "$ROOT/deploy/small-storage-values.yaml" \
+  > "$ROOT/.local/validation/cluster-small.yaml"
 helm template starrocks-operator "$ROOT/deploy/charts/operator-$CHART_VERSION.tgz" --version "$CHART_VERSION" \
   --namespace starrocks-operator --values "$ROOT/deploy/operator-values.yaml" --include-crds \
   > "$ROOT/.local/validation/operator.yaml"

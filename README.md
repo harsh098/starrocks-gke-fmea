@@ -10,8 +10,8 @@ This repository creates the environment for Part 2 and provides procedures to co
 | --- | --- |
 | GKE | Regional Standard cluster, Dataplane V2, current Regular-channel version (`1.36.4-gke.1469000` or later) |
 | Workers | Three `n2-standard-8` workers, one per zone in `us-west4` |
-| Operator and Helm charts | `1.11.1`, matching the version described in Part 1 |
-| StarRocks | Shared-nothing, FE and BE images pinned to `3.5.0` |
+| Operator and Helm charts | `1.11.4`, pinned to the sandbox reference |
+| StarRocks | Shared-nothing, FE and BE images pinned to `3.5.21` |
 | FEs | Three voting members, each with 2 CPU and 4 GiB RAM |
 | BEs | Three members, each with 4 CPU and 16 GiB RAM |
 | Persistent storage | One 100 GiB `premium-rwo` zonal SSD per FE and BE, 600 GiB total |
@@ -33,6 +33,8 @@ The two upstream chart archives are included under `deploy/charts` with checksum
 - OpenTofu 1.8+ or Terraform 1.8+, Google Cloud CLI, `gke-gcloud-auth-plugin`, Helm 3, kubectl compatible with your GKE version, Bash, and Python 3.9+.
 
 The lab incurs charges for GKE, workers, disks, public worker IPs, logging, and network traffic. Worker IPs provide outbound image access. The Kubernetes API is restricted to your configured IPv4 CIDR. No database LoadBalancer is created. Use a separate project and run teardown after the experiments.
+
+Allow at least 750 GiB of SSD quota for the default setup: 600 GiB of database disks plus three 50 GiB `pd-balanced` boot disks. Existing disks and upgrade surge workers need additional quota.
 
 ## 1. Create GKE
 
@@ -74,7 +76,7 @@ The first deployment generates a random root password in `.local/root-password` 
 
 The smoke check verifies worker placement, ready pods, database membership, and reads from a table with three replicas. It creates `fmea.events` only if the table is absent. If a step fails, inspect the pod events, init-password job, and FE/BE logs before running a disruption.
 
-If you have less than 600 GiB of free SSD quota, use the optional profile below **on the first deployment**. It creates six 50 GiB volumes, totaling 300 GiB, and differs from the article's storage capacity. Use the same override on subsequent deploys. Do not switch an existing 100 GiB cluster to smaller volumes; PVCs cannot be shrunk.
+If you have less than 600 GiB of free SSD quota **after creating the workers**, use the optional profile below **on the first deployment**. It creates six 25 GiB volumes, totaling 150 GiB of database storage, and differs from the article's storage capacity. Including worker boot disks, this profile uses 300 GiB of SSD quota before any existing disks or upgrade surge workers. Use the same override on subsequent deploys. Do not switch an existing cluster to smaller volumes; PVCs cannot be shrunk.
 
 ```bash
 SR_VALUES_FILE=deploy/small-storage-values.yaml ./scripts/deploy.sh
@@ -105,8 +107,8 @@ If Kubernetes is already unavailable, run `tofu -chdir=infra destroy` and check 
 
 For static checks, install the packages in `requirements-dev.txt` in a Python virtual environment, then run `./scripts/validate.sh`. Cloud validation status and limitations are recorded in [validation](docs/validation.md).
 
-- [StarRocks Operator v1.11.1](https://github.com/StarRocks/starrocks-kubernetes-operator/tree/v1.11.1)
-- [Password rotation guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.1/doc/change_root_password_howto.md)
+- [StarRocks Operator v1.11.4](https://github.com/StarRocks/starrocks-kubernetes-operator/tree/v1.11.4)
+- [Password rotation guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.4/doc/change_root_password_howto.md)
 - [GKE Dataplane V2](https://cloud.google.com/kubernetes-engine/docs/concepts/dataplane-v2)
 - [GKE node configuration](https://cloud.google.com/kubernetes-engine/docs/how-to/node-system-config)
 - [Google Terraform provider](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/container_cluster)
