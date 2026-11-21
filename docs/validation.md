@@ -38,7 +38,49 @@ The partition helper explicitly allows both `kube-dns` and `node-local-dns` pods
 
 The initial attempt hit `ZONE_RESOURCE_POOL_EXHAUSTED` for temporary `e2-medium` default workers in two zones. The lab now uses the current provider's support for creating GKE without a default pool. This requires GKE `1.36.4-gke.1469000` or later and allocates only the intended N2 experiment workers. If those workers also encounter a capacity error, inspect the managed instance group's errors and select an available machine type or region for a new run.
 
-The failed infrastructure attempt and earlier database volumes were removed. The final demo was installed with fresh volumes and the 1.11.4 CRD. Planned drains, VM resets, and credential rotation are documented procedures; they were not run as part of this validation.
+The failed infrastructure attempt and earlier database volumes were removed. The final demo was installed with fresh volumes and the 1.11.4 CRD. Manual drains, VM resets, and credential rotation remain documented procedures. The actual GKE surge replay below was run separately.
+
+## GKE surge replay
+
+On 21 November 2026, the lab control plane and then its worker pool were upgraded
+from `1.36.4-gke.2377000` to `1.36.5-gke.1259000`. The pool used `SURGE`,
+`maxSurge=1`, and `maxUnavailable=0`, with one worker per zone. An earlier
+same-version request completed without replacing workers and was excluded from
+the replacement result.
+
+StarRocks stayed on `3.5.21`, with operator `1.11.4` and six 25 GiB database volumes.
+Container image digests were compared before and after and were unchanged.
+
+| Check | Observed outcome |
+| --- | --- |
+| Actual replacement | All three original workers and all six original database pods replaced; final workers run the target version |
+| Storage identity | All six PVC UIDs, PV UIDs, volume bindings, and disk handles unchanged |
+| FE identity | All three persisted names unchanged; JE group UUID, numeric ID-to-name mappings, and ID sequence unchanged |
+| Leadership | FE-2 was leader before its drain; FE-1 became leader; FE-2 rejoined as follower |
+| Acknowledged inserts | All 279 unique acknowledged IDs remained readable: 192 direct-client inserts and 87 exec probes |
+| Direct SQL errors | Two during leader handoff: socket closed by peer and connection timeout; both IDs were absent after recovery |
+| Table DDL | 26 create/drop pairs succeeded; two were rejected with only two BEs alive and three replicas requested; one failed with a closed connection |
+| Recovery | Three alive FEs, three alive BEs, twelve healthy baseline replicas, and three healthy probe replicas |
+| Original JE identity exception | Not reproduced; no matching identity/integrity exceptions in captured FE streams or the run's Cloud Logging query |
+| Infrastructure after upgrade | OpenTofu plan reported no changes |
+
+The direct SQL client used the FE Service. Its logs were streamed locally and
+retrieved from Cloud Logging across the client's own eviction. Successful insert
+IDs from both clients were compared with the complete recovered table, including
+a duplicate-ID check. The temporary client Deployment was removed; the probe
+database and private evidence were retained for inspection.
+
+The exec capture also recorded a Kubernetes `No agent available` transport error
+during the control-plane upgrade. It is not counted as a database error. The
+three-replica table-creation rejections are distinct from majority writes to an
+existing table and do not establish loss of FE quorum.
+
+This run reproduced the surge maintenance sequence and a brief client-visible
+interruption, not the historical identity mismatch. The original reference used
+`3.5-latest`; its exact image digest and full incident stack trace are unavailable.
+The current pinned-version result cannot rule out an issue in that earlier code,
+state, or timing. Follow the [surge procedure](../experiments/surge-upgrade.md) for
+another run, preserving failed state before repair if the mismatch appears.
 
 ## Limits
 

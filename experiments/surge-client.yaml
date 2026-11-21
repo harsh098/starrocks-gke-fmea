@@ -1,0 +1,55 @@
+# Create the probe database/table with capture-surge.py before applying this.
+# Use a new SURGE_DATABASE value for each run. This client uses the database
+# network directly; kubectl-exec probes also depend on the control plane.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fmea-surge-client
+  namespace: starrocks
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fmea-surge-client
+  template:
+    metadata:
+      labels:
+        app: fmea-surge-client
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        starrocks-lab: "true"
+      containers:
+        - name: client
+          image: starrocks/fe-ubuntu:3.5.21
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          env:
+            - name: SURGE_DATABASE
+              value: fmea_surge_01
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: starrocks-admin-password
+                  key: password
+          command:
+            - /bin/bash
+            - -c
+            - |
+              trap 'exit 0' TERM INT
+              while true; do
+                id=$(date +%s%N)
+                result=$(timeout 20s mysql --connect-timeout=3 --batch \
+                  --host=starrocks-fmea-fe-service --port=9030 --user=root \
+                  --execute="INSERT INTO ${SURGE_DATABASE}.writes VALUES (${id}, 'in-cluster-client');" 2>&1)
+                code=$?
+                printf 'WRITE id=%s code=%s client=%s\n' "$id" "$code" "$HOSTNAME"
+                if [[ -n "$result" ]]; then printf '%s\n' "$result"; fi
+                sleep 5 & wait $!
+              done

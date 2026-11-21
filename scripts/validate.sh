@@ -3,6 +3,7 @@ source "$(dirname "$0")/common.sh"
 require "$TF"
 require helm
 require python3
+python3 -m py_compile "$ROOT/scripts/capture-surge.py"
 "$TF" -chdir="$ROOT/infra" fmt -check
 "$TF" -chdir="$ROOT/infra" init -backend=false -input=false
 "$TF" -chdir="$ROOT/infra" validate
