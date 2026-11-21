@@ -1,0 +1,7 @@
+# Optional quota-conscious lab profile. This differs from the article's 100 GiB volumes.
+starrocksFESpec:
+  storageSpec:
+    storageSize: 50Gi
+starrocksBeSpec:
+  storageSpec:
+    storageSize: 50Gi

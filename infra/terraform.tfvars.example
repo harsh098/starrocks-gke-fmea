@@ -1,0 +1,4 @@
+project_id = "your-gcp-project"
+admin_cidr = "203.0.113.10/32" # Replace with your public IPv4 address.
+region     = "us-west4"
+zones      = ["us-west4-a", "us-west4-b", "us-west4-c"]

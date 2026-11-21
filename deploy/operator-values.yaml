@@ -1,0 +1,13 @@
+timeZone: UTC
+starrocksOperator:
+  image:
+    repository: starrocks/operator
+    tag: v1.11.1
+  watchNamespace: ""
+  resources:
+    requests:
+      cpu: 500m
+      memory: 400Mi
+    limits:
+      cpu: 500m
+      memory: 800Mi
