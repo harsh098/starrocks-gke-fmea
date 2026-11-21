@@ -2,7 +2,7 @@
 
 ## Static checks
 
-Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google provider `6.50.0`, and Helm `3.19.0`.
+Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google provider `8.12.0`, and Helm `3.19.0`.
 
 | Check | Result |
 | --- | --- |
@@ -19,6 +19,8 @@ Validated on 21 November 2026 with OpenTofu `1.13.9`, Terraform `1.13.5`, Google
 ## Cloud checks
 
 A GKE validation run is in progress. The run uses the optional 50 GiB storage profile because the available SSD quota is below the 600 GiB required by the default profile. No live experiment outcome is established by the static checks above.
+
+The initial attempt hit `ZONE_RESOURCE_POOL_EXHAUSTED` for temporary `e2-medium` default workers in two zones. The lab now uses the current provider's support for creating GKE without a default pool. This requires GKE `1.36.4-gke.1469000` or later and allocates only the intended N2 experiment workers. If those workers also encounter a capacity error, inspect the managed instance group's errors and select an available machine type or region for a new run.
 
 ## Limits
 

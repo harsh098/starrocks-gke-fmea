@@ -51,17 +51,18 @@ resource "google_project_iam_member" "nodes" {
 }
 
 resource "google_container_cluster" "lab" {
-  name                     = var.cluster_name
-  location                 = var.region
-  node_locations           = var.zones
-  network                  = google_compute_network.lab.id
-  subnetwork               = google_compute_subnetwork.lab.id
-  remove_default_node_pool = true
-  initial_node_count       = 1
-  deletion_protection      = false
-  networking_mode          = "VPC_NATIVE"
-  datapath_provider        = "ADVANCED_DATAPATH"
-  resource_labels          = local.labels
+  name           = var.cluster_name
+  location       = var.region
+  node_locations = var.zones
+  network        = google_compute_network.lab.id
+  subnetwork     = google_compute_subnetwork.lab.id
+  # GKE 1.36.4-gke.1469000+ supports creating a control plane without a
+  # temporary default pool. Only the experiment node pool below is allocated.
+  initial_node_count  = 0
+  deletion_protection = false
+  networking_mode     = "VPC_NATIVE"
+  datapath_provider   = "ADVANCED_DATAPATH"
+  resource_labels     = local.labels
 
   release_channel {
     channel = "REGULAR"

@@ -8,7 +8,7 @@ This repository creates the environment for Part 2 and provides procedures to co
 
 | Component | Configuration |
 | --- | --- |
-| GKE | Regional Standard cluster, Dataplane V2, current Regular-channel version |
+| GKE | Regional Standard cluster, Dataplane V2, current Regular-channel version (`1.36.4-gke.1469000` or later) |
 | Workers | Three `n2-standard-8` workers, one per zone in `us-west4` |
 | Operator and Helm charts | `1.11.1`, matching the version described in Part 1 |
 | StarRocks | Shared-nothing, FE and BE images pinned to `3.5.0` |
@@ -27,7 +27,8 @@ The two upstream chart archives are included under `deploy/charts` with checksum
 
 ## Requirements
 
-- An existing GCP project with billing enabled and quota for at least three 8-vCPU workers. Provisioning and upgrades need temporary extra capacity.
+- An existing GCP project with billing enabled and quota for at least three 8-vCPU workers. Upgrades need temporary extra capacity.
+- A GKE Regular-channel version that supports creation without a default node pool (`1.36.4-gke.1469000` or later). The Google provider is pinned in the lock file.
 - Permission to enable APIs, create a VPC, GKE cluster, node service account, and its project IAM binding.
 - OpenTofu 1.8+ or Terraform 1.8+, Google Cloud CLI, `gke-gcloud-auth-plugin`, Helm 3, kubectl compatible with your GKE version, Bash, and Python 3.9+.
 
