@@ -173,6 +173,12 @@ Storage: same PVC claims; replacement pod has a new UID.
 Status: PASS
 ```
 
+### Tip
+
+BDB JE stores replication state in the FE metadata directory, configured through `meta_dir` and often mounted as `fe_meta`. A stale FE must catch up with the leader. An invalid BDB JE environment or damaged metadata can prevent the FE from starting or rejoining. Preserve the metadata directory before attempting recovery. [StarRocks metadata recovery](https://docs.starrocks.io/docs/administration/Meta_recovery/).
+
+For planned GKE maintenance, we prefer blue-green upgrades over the default surge strategy. Blue-green creates replacement capacity before draining the old pool and provides batch and pool soak periods. Use that time to check FE membership, metadata writes, and tablet recovery before continuing. Our lab exercised surge upgrades. The blue-green preference follows its maintenance controls. [GKE upgrade strategies](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/node-pool-upgrade-strategies).
+
 ### Status
 
 **PASS.** The client probe succeeded during the outage, and the database recovered.
@@ -326,3 +332,35 @@ Recovery: BE registered, acknowledged row present, all 12 replicas OK.
 Status: FAIL — stale credentials prevented BE restart.
 Fix: verified; original credential and baseline restored.
 ```
+
+## Conclusion
+
+These tests let us examine Safety, Availability, and Recovery separately. The cluster continued through a single-member outage and recovered its replicas. Password rotation exposed a gap in how we coordinated the database credential, ESO, and container restarts.
+
+### Safety
+
+The connected FE majority committed metadata changes during the partition. The isolated FE refused the SQL connection, and its probe database was absent after recovery. We observed no Split Brain in this run.
+
+The acknowledged inserts remained readable after recovery. In the separate surge run, all 279 acknowledged inserts survived worker replacement. These observations support the tested quorum and write-retention expectations.
+
+### Availability
+
+The cluster accepted metadata writes with one voting FE unavailable. When the leader disappeared, the remaining voters elected a replacement. Existing-table writes also succeeded with one BE down and two replicas available per affected tablet.
+
+Availability depended on the operation. During the surge run, two direct SQL requests failed around leader handoff. Creating a three-replica table also failed while only two BEs were available, although existing-table majority writes could succeed.
+
+### Recovery
+
+Successful recovery required more than a Ready pod. We checked FE and BE membership, read back acknowledged writes, and verified three healthy replicas for each affected tablet.
+
+CRED-1 failed because the replacement BE read a stale password and could not authenticate. We forced ESO to sync, verified the target Secret, and replaced the affected BE. Registration and all twelve tablet replicas recovered. This coordination must be part of the password-rotation procedure.
+
+## Final Verdict
+
+1. **Ready for production for our analytical workload.** Our verdict combines these lab findings with seven months of production experience. It depends on the deployment's quorum, placement, credential management, and recovery procedures.
+
+2. **Upgrades need a scale-up and scale-down plan.** Make replacement capacity available in the disk's zone before removing a worker. Replace members in controlled steps. Check membership and tablet health before proceeding.
+
+3. **Reserve a two-to-three-minute maintenance window for GKE upgrades.** This is our operating allowance for the workload. In our seven months of production experience, the cluster became available again in approximately two to three seconds after the interruptions we encountered. That brief interruption was acceptable for us. FE metadata recovery can take longer if BDB JE state is invalid or metadata is damaged, so we prefer blue-green upgrades for planned maintenance.
+
+4. **Use batch ingestion and a replayable source.** For analytical workloads, prefer batch writes through Stream Load. Its asynchronous Merge Commit mode can accept data before the merged transaction finishes, so verify the final transaction status. For continuous ingestion, Kafka with Routine Load provides an asynchronous path. Keep source data long enough to replay batches during recovery, and design retries to avoid duplicate rows. [Stream Load](https://docs.starrocks.io/docs/loading/StreamLoad/), [Kafka Routine Load](https://docs.starrocks.io/docs/loading/kafka/RoutineLoad/).
