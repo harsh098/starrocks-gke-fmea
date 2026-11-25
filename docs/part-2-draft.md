@@ -291,6 +291,8 @@ The cluster has only two available replicas per affected tablet during this outa
 
 We rotate the root password while ESO polls hourly, then restart one BE before the target Secret updates. We record the failed restart and test recovery after a forced sync.
 
+The BE explicitly needs the current root password in its `MYSQL_PWD` environment variable to authenticate to the FE and join the cluster. The startup scripts also use this credential for administrative SQL operations during cluster management. Rotating the database password requires updating the Secret and replacing the affected container so it receives the new environment value. [StarRocks Operator password rotation guide](https://github.com/StarRocks/starrocks-kubernetes-operator/blob/v1.11.4/doc/change_root_password_howto.md).
+
 ![CRED-1 test layout](diagrams/cred-1.png)
 
 *Schematic placement. The runner selects the actual members and zones.*
