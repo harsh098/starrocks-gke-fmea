@@ -92,8 +92,8 @@ SR_VALUES_FILE=deploy/small-storage-values.yaml ./scripts/deploy.sh
 
 Follow [the experiment guide](experiments/README.md). It covers forced FE replacement, a BE held unavailable for a majority-write test, a simulated database network partition, and stale credentials after a password change. The [recorded surge upgrade](experiments/surge-upgrade.md) remains available as a separate planned-worker-replacement result. Record new results using [the run template](docs/run-record.md).
 
-The [Part 2 draft](docs/part-2-draft.md) links each case to its commands and
-[captured run output](docs/part-2-results.md).
+The [Part 2 draft](docs/part-2-draft.md) walks through setup and the experiments.
+The [run records](docs/part-2-results.md) hold the captured output.
 
 Run one disruption at a time. Wait for all voting FEs, BEs, and tablet replicas to recover before moving to the next experiment. A Ready pod alone does not prove database membership or data recovery. These checks do not establish full ACID compliance or linearizability.
 
