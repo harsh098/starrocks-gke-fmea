@@ -39,7 +39,7 @@ The partition helper explicitly allows both `kube-dns` and `node-local-dns` pods
 
 The initial attempt hit `ZONE_RESOURCE_POOL_EXHAUSTED` for temporary `e2-medium` default workers in two zones. The lab now uses the current provider's support for creating GKE without a default pool. This requires GKE `1.36.4-gke.1469000` or later and allocates only the intended N2 experiment workers. If those workers also encounter a capacity error, inspect the managed instance group's errors and select an available machine type or region for a new run.
 
-The failed infrastructure attempt and earlier database volumes were removed. The final demo was installed with fresh volumes and the 1.11.4 CRD. Manual drains, VM resets, and credential rotation remain documented procedures. The actual GKE surge replay below was run separately.
+The failed infrastructure attempt and earlier database volumes were removed. The final demo was installed with fresh volumes and the 1.11.4 CRD. Credential rotation remains a documented procedure. The actual GKE surge replay below was run separately.
 
 ## GKE surge replay
 
@@ -81,8 +81,9 @@ retention, and full replica recovery. Follow the
 ## Limits
 
 The forced-deletion result covers one FE follower. Abrupt VM loss and simultaneous
-loss of multiple voting FEs were not validated in that run. The one-hour stale
-credential window is planned for a later password-rotation test.
+loss of multiple voting FEs were outside the experiment scope. The subsequent
+[CRED-1 run](part-2-results.md#cred-1) reproduced an ESO stale-password
+startup failure and verified recovery after forced sync and BE replacement.
 
 Blue-green upgrades are configured for the next deployment and have passed static
 validation; they have not yet been exercised in this lab.
@@ -91,8 +92,17 @@ This lab provides bounded operational tests. It does not prove complete ACID beh
 
 ## Lab lifecycle
 
-The environment was decommissioned on 22 November 2026 (IST). OpenTofu destroyed
-all eleven managed resources and the state is empty. The lab's worker VMs, boot
-disks, and six database disks were verified deleted. A new apply and deployment
-are required before another experiment. Project APIs remain enabled as configured
-by `disable_on_destroy = false`.
+The first environment was decommissioned on 22 November 2026 (IST). OpenTofu
+destroyed all eleven managed resources; the worker VMs, boot disks, and six
+database disks were verified deleted. Project APIs remained enabled as
+configured by `disable_on_destroy = false`.
+
+The lab was recreated on 25 November 2026 (IST) for the revised Part 2 tests.
+OpenTofu added eleven resources and a follow-up plan reported no changes. The
+fixed pool has three Ready workers, one per zone, on GKE
+`1.36.4-gke.2377000`. Operator and charts remain `1.11.4`; FE and BE images
+remain `3.5.21`. The new deployment uses six bound 25 GiB volumes. The baseline
+smoke check passed: three ready and alive FEs, three ready and alive BEs, four
+tablets with three healthy replicas on distinct BEs, and readable baseline rows.
+The [Part 2 experiment records](part-2-results.md) document the subsequent
+live fault tests and link each case to the commands and captured output.

@@ -9,7 +9,7 @@ This repository creates the environment for Part 2 and provides procedures to co
 | Component | Configuration |
 | --- | --- |
 | GKE | Regional Standard cluster, Dataplane V2, current Regular-channel version (`1.36.4-gke.1469000` or later) |
-| Workers | Three `n2-standard-8` workers, one per zone in `us-west4` |
+| Workers | Fixed pool of three `n2-standard-8` workers, one per zone in `us-west4`; no autoscaler |
 | Operator and Helm charts | `1.11.4`, pinned to the sandbox reference |
 | StarRocks | Shared-nothing, FE and BE images pinned to `3.5.21` |
 | FEs | Three voting members, each with 2 CPU and 4 GiB RAM |
@@ -90,7 +90,10 @@ SR_VALUES_FILE=deploy/small-storage-values.yaml ./scripts/deploy.sh
 
 ## 3. Run the experiments
 
-Follow [the experiment guide](experiments/README.md). It covers FE/BE restarts, planned worker drain, worker replacement, a zone network partition, and stale credentials after a password change. Each procedure states the fault, observations, and recovery steps. Record results using [the run template](docs/run-record.md).
+Follow [the experiment guide](experiments/README.md). It covers forced FE replacement, a BE held unavailable for a majority-write test, a simulated database network partition, and stale credentials after a password change. The [recorded surge upgrade](experiments/surge-upgrade.md) remains available as a separate planned-worker-replacement result. Record new results using [the run template](docs/run-record.md).
+
+The [Part 2 draft](docs/part-2-draft.md) links each case to its commands and
+[captured run output](docs/part-2-results.md).
 
 Run one disruption at a time. Wait for all voting FEs, BEs, and tablet replicas to recover before moving to the next experiment. A Ready pod alone does not prove database membership or data recovery. These checks do not establish full ACID compliance or linearizability.
 

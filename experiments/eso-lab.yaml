@@ -1,0 +1,74 @@
+# Lab-only ESO provider. This namespace holds just the source credential.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: starrocks-eso-source
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: starrocks-eso-reader
+  namespace: starrocks
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: read-source-secret
+  namespace: starrocks-eso-source
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-source-secret
+  namespace: starrocks-eso-source
+subjects:
+  - kind: ServiceAccount
+    name: starrocks-eso-reader
+    namespace: starrocks
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: read-source-secret
+---
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: starrocks-password-source
+  namespace: starrocks
+spec:
+  provider:
+    kubernetes:
+      remoteNamespace: starrocks-eso-source
+      server:
+        caProvider:
+          type: ConfigMap
+          name: kube-root-ca.crt
+          key: ca.crt
+      auth:
+        serviceAccount:
+          name: starrocks-eso-reader
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: starrocks-admin-password
+  namespace: starrocks
+spec:
+  refreshPolicy: Periodic
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: starrocks-password-source
+  target:
+    name: starrocks-admin-password
+    creationPolicy: Merge
+    deletionPolicy: Retain
+  data:
+    - secretKey: password
+      remoteRef:
+        key: starrocks-admin-password
+        property: password

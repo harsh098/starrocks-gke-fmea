@@ -9,7 +9,7 @@ Copy this file into a local ignored directory for each experiment. Remove accoun
 | GKE version and dataplane | |
 | Operator and chart versions | |
 | FE and BE image digests (`status.containerStatuses[].imageID`) | |
-| Worker type, count, and zones | |
+| Worker type, fixed desired count, actual count, and zones | |
 | Storage classes and disk zones | |
 | FE voting members and leader | |
 | BE members; tablet replication and write quorum | |
@@ -22,7 +22,7 @@ Copy this file into a local ignored directory for each experiment. Remove accoun
 | Fault start/end UTC | |
 | Actual client responses and acknowledged writes | |
 | FE leadership and membership observations | |
-| BE registration and tablet recovery observations | |
+| BE registration; tablet health at baseline, during outage, and after recovery | |
 | Kubernetes events, restarts, and placement | |
 | Recovery steps and operator effort | |
 | Pass, fail, or inconclusive, with evidence | |
