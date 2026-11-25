@@ -4,6 +4,27 @@ These procedures implement the Part 2 test matrix. They describe what to measure
 
 Before each experiment, run `./scripts/smoke-test.sh` and record [the baseline](../docs/run-record.md). Export `KUBECONFIG="$PWD/.local/kubeconfig"` for the direct kubectl commands below. Capture timestamps, client responses, database membership, replica status, pod events, and relevant FE/BE logs. Run only one disruption at a time. Wait for all three FEs, all three BEs, and every affected tablet's three replicas to recover before the next test.
 
+## Run one test
+
+After deploying and connecting to the lab, run one command from the repository
+directory. Each runner selects its own target and probe identifiers. It prints
+the relevant observations and saves detailed evidence under the ignored
+`.local/runs/` directory. Wait for recovery before selecting another test.
+
+| Test | Command |
+| --- | --- |
+| FE-1 | `python3 scripts/run-member-test.py FE-1` |
+| FE-2 | `python3 scripts/run-member-test.py FE-2` |
+| FE-3 | `bash scripts/run-partition-test.sh` |
+| BE-1 | `python3 scripts/run-member-test.py BE-1` |
+| ESO preparation | `bash scripts/setup-eso-test.sh` |
+| CRED-1 | `bash scripts/run-credential-test.sh` |
+
+CRED-1 reports FAIL when it reproduces the stale-password startup failure.
+The runner then forces ESO synchronization, verifies recovery, and restores
+the original credential. A zero script exit means the reproduction and
+recovery completed. The database test verdict remains FAIL.
+
 ## FE-1 and FE-2: FE pod loss and rejoin
 
 **Model:** FE process crash-recovery. Force deletion requests replacement with zero grace, but the API response alone does not confirm that the old process has stopped.

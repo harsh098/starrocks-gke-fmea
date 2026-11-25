@@ -106,3 +106,13 @@ smoke check passed: three ready and alive FEs, three ready and alive BEs, four
 tablets with three healthy replicas on distinct BEs, and readable baseline rows.
 The [Part 2 experiment records](part-2-results.md) document the subsequent
 live fault tests and link each case to the commands and captured output.
+
+The lab was recreated again on 25 November for the single-command test runners.
+FE-1, FE-2, FE-3, and BE-1 passed. CRED-1 reproduced the stale-password
+authentication failure, and forced ESO synchronization followed by BE
+replacement restored all twelve baseline replicas. The original credential
+and healthy baseline were restored. The first FE-2 attempt encountered a
+transient membership-query DNS error. The runner now retries that observation
+within a bounded window, and the repeated test passed. The latest short
+observations and procedures are in the [Part 2 draft](part-2-draft.md).
+The infrastructure plan reported no changes. The lab is running.
