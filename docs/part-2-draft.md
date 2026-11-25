@@ -107,6 +107,10 @@ The forced pod exits exercise database process Crash-Recovery. The surge test us
 
 We remove one FE follower and check that the two remaining voters can commit a metadata change. We then let the follower return and verify its membership and stored metadata.
 
+![FE-1 test layout](diagrams/fe-1.png)
+
+*Schematic placement. The runner selects the actual members and zones.*
+
 ### Procedure
 
 1. Check FE membership and select a follower automatically.
@@ -145,6 +149,10 @@ A force-delete response does not establish when the old process stopped. The scr
 ## FE-2 : Leader recovery
 
 We remove the FE leader and check whether the two remaining voters elect a replacement. We then commit a metadata change and verify the former leader rejoins.
+
+![FE-2 test layout](diagrams/fe-2.png)
+
+*Schematic placement. The runner selects the actual members and zones.*
 
 ### Procedure
 
@@ -191,6 +199,10 @@ A leader handoff can interrupt a client request. Check the operation after recov
 
 We isolate the leader’s zone from the other database pods. We test metadata writes from both sides, then restore communication and inspect the committed state.
 
+![FE-3 test layout](diagrams/fe-3.png)
+
+*Schematic placement. The runner selects the actual members and zones.*
+
 ### Procedure
 
 1. Find the leader and its zone.
@@ -229,6 +241,10 @@ The policy simulates a database network partition. DNS and Kubernetes control-pl
 ## BE-1 : Backend availability
 
 We keep one BE unavailable while writing to an existing table. After the BE returns, we check the acknowledged row and every affected tablet replica.
+
+![BE-1 test layout](diagrams/be-1.png)
+
+*Schematic placement. The runner selects the actual members and zones.*
 
 ### Procedure
 
@@ -274,6 +290,10 @@ The cluster has only two available replicas per affected tablet during this outa
 ## CRED-1 : Password rotation
 
 We rotate the root password while ESO polls hourly, then restart one BE before the target Secret updates. We record the failed restart and test recovery after a forced sync.
+
+![CRED-1 test layout](diagrams/cred-1.png)
+
+*Schematic placement. The runner selects the actual members and zones.*
 
 ### Procedure
 
